@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+*.jsonl
+*.snap
+*.snapshot
+.DS_Store
+coverage/
+tmp/
+temp/
