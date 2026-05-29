@@ -14,8 +14,8 @@ test("sanitizer strips sensitive payloads", () => {
       status: "ok",
       token: "abc",
       chat_id: "8213682285",
-      path: "/root/.openclaw/secret"
-    }
+      path: "/root/.openclaw/secret",
+    },
   });
   const text = JSON.stringify(sanitized);
 
@@ -38,17 +38,20 @@ test("failed tool results expose sanitized actionable diagnostics", () => {
       data: {
         name: "gog",
         isError: true,
-        command: "GOG_KEYRING_PASSWORD=super-secret gog calendar events --account favuka.ai@gmail.com",
+        command:
+          "GOG_KEYRING_PASSWORD=super-secret gog calendar events --account favuka.ai@gmail.com",
         details: {
           status: "failed",
           exitCode: 1,
-          stderr: "Error: keyring unlock failed because GOG_KEYRING_PASSWORD is invalid",
-          aggregated: "gog calendar events failed for favuka.ai@gmail.com"
-        }
-      }
+          stderr:
+            "Error: keyring unlock failed because GOG_KEYRING_PASSWORD is invalid\nat openKeyring (/root/.openclaw/private/gog.js:10:2)",
+          aggregated:
+            "gog calendar events failed for favuka.ai@gmail.com\nGOG_KEYRING_PASSWORD=super-secret",
+        },
+      },
     },
     0,
-    "run-1"
+    "run-1",
   );
 
   assert.equal(event.kind, "error");
@@ -56,9 +59,15 @@ test("failed tool results expose sanitized actionable diagnostics", () => {
   assert.equal(event.metadata.exitCode, 1);
   assert.equal(event.metadata.errorClass, "AUTH_FAILED");
   assert.match(String(event.metadata.commandSummary), /gog calendar events/);
+  assert.match(String(event.metadata.stderrFull), /keyring unlock failed/);
+  assert.match(
+    String(event.metadata.payloadFull),
+    /gog calendar events failed/,
+  );
 
   const text = JSON.stringify(event);
   assert.doesNotMatch(text, /super-secret|favuka\.ai@gmail\.com/);
+  assert.doesNotMatch(text, /\/root\/\.openclaw/);
   assert.doesNotMatch(text, /GOG_KEYRING_PASSWORD=super-secret/);
 });
 
@@ -71,22 +80,24 @@ test("failed runtime errors classify module and file failures", () => {
         isError: true,
         details: {
           exitCode: 1,
-          stderr: "Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/missing.js'"
-        }
-      }
+          stderr:
+            "Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/missing.js'",
+        },
+      },
     },
     0,
-    "run-2"
+    "run-2",
   );
   const missingFileEvent = normalizeTrajectoryEvent(
     {
       type: "runtime.error",
       data: {
-        message: "ENOENT: no such file or directory, open '/root/.openclaw/missing.json'"
-      }
+        message:
+          "ENOENT: no such file or directory, open '/root/.openclaw/missing.json'",
+      },
     },
     1,
-    "run-2"
+    "run-2",
   );
 
   assert.equal(moduleEvent.metadata.errorClass, "MODULE_NOT_FOUND");
@@ -100,11 +111,13 @@ test("denied CORS origin returns controlled 403", async () => {
     const response = await app.inject({
       method: "GET",
       url: "/health",
-      headers: { origin: "https://evil.example" }
+      headers: { origin: "https://evil.example" },
     });
 
     assert.equal(response.statusCode, 403);
-    assert.deepEqual(JSON.parse(response.body), { error: "cors_origin_denied" });
+    assert.deepEqual(JSON.parse(response.body), {
+      error: "cors_origin_denied",
+    });
     assert.doesNotMatch(response.body, /stack|trace/i);
   } finally {
     await app.close();
@@ -117,9 +130,14 @@ test("run detail does not embed full event list", async () => {
     const runsResponse = await app.inject("/api/runs?limit=1");
     assert.equal(runsResponse.statusCode, 200);
     const runs = JSON.parse(runsResponse.body) as Array<{ id: string }>;
-    assert.ok(runs.length > 0, "expected at least one OpenClaw run for integration check");
+    assert.ok(
+      runs.length > 0,
+      "expected at least one OpenClaw run for integration check",
+    );
 
-    const detailResponse = await app.inject(`/api/runs/${encodeURIComponent(runs[0].id)}`);
+    const detailResponse = await app.inject(
+      `/api/runs/${encodeURIComponent(runs[0].id)}`,
+    );
     assert.equal(detailResponse.statusCode, 200);
     const detail = JSON.parse(detailResponse.body) as Record<string, unknown>;
     assert.equal(Array.isArray(detail.events), false);
@@ -135,9 +153,14 @@ test("events endpoint respects limit", async () => {
     const runsResponse = await app.inject("/api/runs?limit=1");
     assert.equal(runsResponse.statusCode, 200);
     const runs = JSON.parse(runsResponse.body) as Array<{ id: string }>;
-    assert.ok(runs.length > 0, "expected at least one OpenClaw run for integration check");
+    assert.ok(
+      runs.length > 0,
+      "expected at least one OpenClaw run for integration check",
+    );
 
-    const eventsResponse = await app.inject(`/api/runs/${encodeURIComponent(runs[0].id)}/events?limit=5`);
+    const eventsResponse = await app.inject(
+      `/api/runs/${encodeURIComponent(runs[0].id)}/events?limit=5`,
+    );
     assert.equal(eventsResponse.statusCode, 200);
     const events = JSON.parse(eventsResponse.body) as unknown[];
     assert.equal(Array.isArray(events), true);
@@ -160,41 +183,60 @@ test("runs endpoint applies safe filters and pagination", async () => {
       summary: string;
       origin: { source: string };
     }>;
-    assert.ok(runs.length > 0, "expected at least one OpenClaw run for filter check");
+    assert.ok(
+      runs.length > 0,
+      "expected at least one OpenClaw run for filter check",
+    );
 
     const first = runs[0];
-    const statusResponse = await app.inject(`/api/runs?status=${encodeURIComponent(first.status)}`);
+    const statusResponse = await app.inject(
+      `/api/runs?status=${encodeURIComponent(first.status)}`,
+    );
     const statusRuns = JSON.parse(statusResponse.body) as typeof runs;
     assert.ok(statusRuns.length > 0);
     assert.ok(statusRuns.every((run) => run.status === first.status));
 
-    const agentIdResponse = await app.inject(`/api/runs?agentId=${encodeURIComponent(first.agentId)}`);
+    const agentIdResponse = await app.inject(
+      `/api/runs?agentId=${encodeURIComponent(first.agentId)}`,
+    );
     const agentIdRuns = JSON.parse(agentIdResponse.body) as typeof runs;
     assert.ok(agentIdRuns.length > 0);
     assert.ok(agentIdRuns.every((run) => run.agentId === first.agentId));
 
-    const agentResponse = await app.inject(`/api/runs?agent=${encodeURIComponent(first.agentName.slice(0, 4))}`);
+    const agentResponse = await app.inject(
+      `/api/runs?agent=${encodeURIComponent(first.agentName.slice(0, 4))}`,
+    );
     const agentRuns = JSON.parse(agentResponse.body) as typeof runs;
     assert.ok(agentRuns.length > 0);
     assert.ok(
       agentRuns.every(
         (run) =>
           run.agentId === first.agentId ||
-          run.agentName.toLowerCase().includes(first.agentName.slice(0, 4).toLowerCase())
-      )
+          run.agentName
+            .toLowerCase()
+            .includes(first.agentName.slice(0, 4).toLowerCase()),
+      ),
     );
 
-    const term = first.summary.split(/\s+/).find((word) => word.length >= 4) ?? first.origin.source;
-    const qResponse = await app.inject(`/api/runs?q=${encodeURIComponent(term)}`);
+    const term =
+      first.summary.split(/\s+/).find((word) => word.length >= 4) ??
+      first.origin.source;
+    const qResponse = await app.inject(
+      `/api/runs?q=${encodeURIComponent(term)}`,
+    );
     const qRuns = JSON.parse(qResponse.body) as typeof runs;
     assert.ok(qRuns.length > 0);
     assert.ok(
       qRuns.every((run) =>
-        `${run.agentName} ${run.summary} ${run.origin.source}`.toLowerCase().includes(term.toLowerCase())
-      )
+        `${run.agentName} ${run.summary} ${run.origin.source}`
+          .toLowerCase()
+          .includes(term.toLowerCase()),
+      ),
     );
 
-    const searchResponse = await app.inject(`/api/runs?search=${encodeURIComponent(term)}&limit=1`);
+    const searchResponse = await app.inject(
+      `/api/runs?search=${encodeURIComponent(term)}&limit=1`,
+    );
     const searchRuns = JSON.parse(searchResponse.body) as typeof runs;
     assert.ok(searchRuns.length <= 1);
     assert.ok(searchRuns.length > 0);
@@ -202,14 +244,19 @@ test("runs endpoint applies safe filters and pagination", async () => {
     const pagedResponse = await app.inject("/api/runs?limit=1&offset=1");
     const pagedRuns = JSON.parse(pagedResponse.body) as typeof runs;
     assert.ok(pagedRuns.length <= 1);
-    if (runs.length > 1 && pagedRuns.length === 1) assert.equal(pagedRuns[0].id, runs[1].id);
+    if (runs.length > 1 && pagedRuns.length === 1)
+      assert.equal(pagedRuns[0].id, runs[1].id);
 
     const comboResponse = await app.inject(
-      `/api/runs?status=${encodeURIComponent(first.status)}&agentId=${encodeURIComponent(first.agentId)}&q=${encodeURIComponent(term)}`
+      `/api/runs?status=${encodeURIComponent(first.status)}&agentId=${encodeURIComponent(first.agentId)}&q=${encodeURIComponent(term)}`,
     );
     const comboRuns = JSON.parse(comboResponse.body) as typeof runs;
     assert.ok(comboRuns.length > 0);
-    assert.ok(comboRuns.every((run) => run.status === first.status && run.agentId === first.agentId));
+    assert.ok(
+      comboRuns.every(
+        (run) => run.status === first.status && run.agentId === first.agentId,
+      ),
+    );
   } finally {
     await app.close();
   }
