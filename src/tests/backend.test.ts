@@ -71,6 +71,52 @@ test("failed tool results expose sanitized actionable diagnostics", () => {
   assert.doesNotMatch(text, /GOG_KEYRING_PASSWORD=super-secret/);
 });
 
+test("full diagnostics preserve complete sanitized git errors", () => {
+  const hints = Array.from(
+    { length: 180 },
+    (_, index) =>
+      `hint: complete git guidance line ${index} without artificial truncation`,
+  ).join("\n");
+  const gitError = [
+    "To https://github.com/favuka/operador-visor.git",
+    " ! [rejected]        main -> main (fetch first)",
+    "error: failed to push some refs to https://github.com/favuka/operador-visor.git",
+    "hint: Updates were rejected because the remote contains work that you do",
+    "hint: not have locally. This is usually caused by another repository pushing",
+    "hint: to the same ref. You may want to first integrate the remote changes",
+    "hint: (e.g., 'git pull ...') before pushing again.",
+    hints,
+    "hint: final git hint line stays visible",
+  ].join("\n");
+
+  const event = normalizeTrajectoryEvent(
+    {
+      type: "tool.result",
+      ts: "2026-05-29T14:00:00.000Z",
+      seq: 8,
+      data: {
+        name: "bash",
+        isError: true,
+        details: {
+          status: "failed",
+          exitCode: 1,
+          aggregated: gitError,
+        },
+      },
+    },
+    0,
+    "run-git",
+  );
+
+  assert.match(String(event.metadata.payloadSummary), /\.\.\.$/);
+  assert.match(
+    String(event.metadata.payloadFull),
+    /final git hint line stays visible$/,
+  );
+  assert.doesNotMatch(String(event.metadata.payloadFull), /artificial truncation\.\.\.$/);
+  assert.doesNotMatch(JSON.stringify(event), /github\.com\/favuka/);
+});
+
 test("failed runtime errors classify module and file failures", () => {
   const moduleEvent = normalizeTrajectoryEvent(
     {

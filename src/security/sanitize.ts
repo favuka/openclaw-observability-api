@@ -38,7 +38,7 @@ const SAFE_METADATA_KEYS = new Set([
 
 export function sanitizeText(
   value: unknown,
-  maxLength = 160,
+  maxLength: number | null = 160,
   preserveFormatting = false,
 ): string {
   if (value === null || value === undefined) return "";
@@ -79,14 +79,16 @@ export function sanitizeText(
         .replace(/\n{4,}/g, "\n\n\n")
         .trim()
     : text.replace(/\s+/g, " ").trim();
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+  return maxLength !== null && text.length > maxLength
+    ? `${text.slice(0, maxLength - 1)}...`
+    : text;
 }
 
 function metadataTextLimit(key: string): {
-  length: number;
+  length: number | null;
   preserveFormatting: boolean;
 } {
-  if (key.endsWith("Full")) return { length: 6000, preserveFormatting: true };
+  if (key.endsWith("Full")) return { length: null, preserveFormatting: true };
   if (
     key === "stderr" ||
     key === "stack" ||

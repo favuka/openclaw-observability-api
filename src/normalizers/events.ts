@@ -201,19 +201,19 @@ function errorDiagnostic(
   return {
     tool,
     commandSummary: commandSummary(tool, data),
-    messageFull: message ? sanitizeText(message, 6000, true) : undefined,
+    messageFull: message ? sanitizeText(message, null, true) : undefined,
     stderr: stderr ? sanitizeText(stderr, 220) : undefined,
-    stderrFull: stderr ? sanitizeText(stderr, 6000, true) : undefined,
+    stderrFull: stderr ? sanitizeText(stderr, null, true) : undefined,
     exitCode,
     stack: stack ? sanitizeText(stack, 220) : undefined,
-    stackFull: stack ? sanitizeText(stack, 6000, true) : undefined,
+    stackFull: stack ? sanitizeText(stack, null, true) : undefined,
     cause: cause ? sanitizeText(cause, 180) : undefined,
-    causeFull: cause ? sanitizeText(cause, 6000, true) : undefined,
+    causeFull: cause ? sanitizeText(cause, null, true) : undefined,
     payloadSummary: payloadSummary
       ? sanitizeText(payloadSummary, 220)
       : undefined,
     payloadFull: payloadSummary
-      ? sanitizeText(payloadSummary, 6000, true)
+      ? sanitizeText(payloadSummary, null, true)
       : undefined,
     errorClass: classifyError(type, data, diagnosticText),
     toolStatus: stringValue(data.status) ?? stringValue(details?.status),
