@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildServer, assertLocalBind } from "../server.js";
 import { sanitizeResponse } from "../security/sanitize.js";
+import { normalizeTrajectoryEvent } from "../normalizers/events.js";
 
 test("sanitizer strips sensitive payloads", () => {
   const sanitized = sanitizeResponse({
@@ -26,6 +27,71 @@ test("sanitizer strips sensitive payloads", () => {
   assert.doesNotMatch(text, /private-user-images/);
   assert.doesNotMatch(text, /8213682285/);
   assert.doesNotMatch(text, /full prompt/);
+});
+
+test("failed tool results expose sanitized actionable diagnostics", () => {
+  const event = normalizeTrajectoryEvent(
+    {
+      type: "tool.result",
+      ts: "2026-05-29T13:00:00.000Z",
+      seq: 7,
+      data: {
+        name: "gog",
+        isError: true,
+        command: "GOG_KEYRING_PASSWORD=super-secret gog calendar events --account favuka.ai@gmail.com",
+        details: {
+          status: "failed",
+          exitCode: 1,
+          stderr: "Error: keyring unlock failed because GOG_KEYRING_PASSWORD is invalid",
+          aggregated: "gog calendar events failed for favuka.ai@gmail.com"
+        }
+      }
+    },
+    0,
+    "run-1"
+  );
+
+  assert.equal(event.kind, "error");
+  assert.equal(event.metadata.tool, "gog");
+  assert.equal(event.metadata.exitCode, 1);
+  assert.equal(event.metadata.errorClass, "AUTH_FAILED");
+  assert.match(String(event.metadata.commandSummary), /gog calendar events/);
+
+  const text = JSON.stringify(event);
+  assert.doesNotMatch(text, /super-secret|favuka\.ai@gmail\.com/);
+  assert.doesNotMatch(text, /GOG_KEYRING_PASSWORD=super-secret/);
+});
+
+test("failed runtime errors classify module and file failures", () => {
+  const moduleEvent = normalizeTrajectoryEvent(
+    {
+      type: "tool.result",
+      data: {
+        name: "node",
+        isError: true,
+        details: {
+          exitCode: 1,
+          stderr: "Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/missing.js'"
+        }
+      }
+    },
+    0,
+    "run-2"
+  );
+  const missingFileEvent = normalizeTrajectoryEvent(
+    {
+      type: "runtime.error",
+      data: {
+        message: "ENOENT: no such file or directory, open '/root/.openclaw/missing.json'"
+      }
+    },
+    1,
+    "run-2"
+  );
+
+  assert.equal(moduleEvent.metadata.errorClass, "MODULE_NOT_FOUND");
+  assert.equal(missingFileEvent.metadata.errorClass, "MISSING_FILE");
+  assert.doesNotMatch(JSON.stringify(moduleEvent), /\/app\/missing\.js/);
 });
 
 test("denied CORS origin returns controlled 403", async () => {

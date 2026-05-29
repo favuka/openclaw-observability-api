@@ -13,6 +13,13 @@ const SAFE_METADATA_KEYS = new Set([
   "name",
   "status",
   "exitCode",
+  "errorClass",
+  "commandSummary",
+  "stderr",
+  "stack",
+  "cause",
+  "payloadSummary",
+  "toolStatus",
   "durationMs",
   "source",
   "severity",
@@ -27,6 +34,10 @@ const SAFE_METADATA_KEYS = new Set([
 export function sanitizeText(value: unknown, maxLength = 160): string {
   if (value === null || value === undefined) return "";
   let text = String(value);
+  text = text.replace(
+    /\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASS|API_KEY|KEYRING)[A-Z0-9_]*)\s*=\s*\S+/g,
+    "$1=[redacted]"
+  );
   text = text.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]");
   text = text.replace(/\b(?:sk|pk|ghp|gho|github_pat)_[A-Za-z0-9_]{12,}\b/g, "[redacted]");
   text = text.replace(/\b(?:token|api[_-]?key|secret|password)=\S+/gi, "$1=[redacted]");
