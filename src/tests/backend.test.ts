@@ -117,6 +117,20 @@ test("full diagnostics preserve complete sanitized git errors", () => {
   assert.doesNotMatch(JSON.stringify(event), /github\.com\/favuka/);
 });
 
+test("response sanitizer does not truncate full diagnostic fields", () => {
+  const longPayload = `${Array.from({ length: 80 }, () => "safe-word").join(" ")}\nhint: final line stays visible`;
+  const sanitized = sanitizeResponse({
+    metadata: {
+      payloadSummary: longPayload,
+      payloadFull: longPayload,
+    },
+  }) as { metadata: { payloadSummary: string; payloadFull: string } };
+
+  assert.match(sanitized.metadata.payloadSummary, /\.\.\.$/);
+  assert.match(sanitized.metadata.payloadFull, /final line stays visible$/);
+  assert.doesNotMatch(sanitized.metadata.payloadFull, /\.\.\.$/);
+});
+
 test("failed runtime errors classify module and file failures", () => {
   const moduleEvent = normalizeTrajectoryEvent(
     {

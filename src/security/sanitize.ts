@@ -149,12 +149,16 @@ export function sanitizeResponse<T>(value: T): T {
       continue;
     }
     if (typeof rawValue === "string") {
-      output[key] = ["id", "runId", "agentId"].includes(key)
-        ? rawValue
-        : sanitizeText(
-            rawValue,
-            key === "summary" || key === "message" ? 220 : 120,
-          );
+      if (["id", "runId", "agentId"].includes(key)) {
+        output[key] = rawValue;
+      } else if (key.endsWith("Full")) {
+        output[key] = sanitizeText(rawValue, null, true);
+      } else {
+        output[key] = sanitizeText(
+          rawValue,
+          key === "summary" || key === "message" ? 220 : 120,
+        );
+      }
     } else if (
       Array.isArray(rawValue) ||
       (rawValue && typeof rawValue === "object")
